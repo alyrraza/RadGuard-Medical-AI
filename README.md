@@ -2,9 +2,9 @@
 
 > Automatically detect errors in AI-generated chest X-ray reports using multimodal deep learning.
 
-<!-- DEMO PLACEHOLDER -->
+**🌐 Live Demo:** [http://16.171.7.187:3000](http://16.171.7.187:3000) &nbsp;·&nbsp; **📊 MLflow Experiments:** [http://16.171.7.187:5000](http://16.171.7.187:5000)
 
-<!-- **Live Demo:** [https://radguard.demo.link](https://radguard.demo.link) ← add when deployed -->
+> ⚠️ Demo hosted on AWS EC2 (eu-north-1) for thesis evaluation. Available for a limited time.
 
 ---
 
