@@ -192,7 +192,7 @@ RadGuard-Medical-AI/
 ### With Docker (recommended)
 
 ```bash
-git clone https://github.com/your-username/RadGuard-Medical-AI
+git clone https://github.com/alyrraza/RadGuard-Medical-AI
 cd RadGuard-Medical-AI
 
 # set your HuggingFace token in .env (for private model repo)
@@ -208,12 +208,14 @@ docker-compose up --build
 ## Demo
 
 ### Live Inference
-![Frontend](docs/Screenshot 2026-04-28 215143.jpg)
-![FrontEnd_Remaining](docs/Screenshot 2026-04-28 215155.jpg)
+![Frontend](docs/Screenshot%202026-04-28%20215143.jpg)
+![Frontend Results](docs/Screenshot%202026-04-28%20215155.jpg)
 
 ### MLflow Experiment Tracking
+![MLflow](docs/screenshot_mlflow.png)
+
 ### Full Demo Video
-<video src="docs/bandicam 2026-04-28 01-12-47-957.mp4" controls width="100%"></video>
+<video src="docs/bandicam%202026-04-28%2001-12-47-957.mp4" controls width="100%"></video>
 ### Without Docker
 
 **Backend:**
