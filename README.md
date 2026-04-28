@@ -3,6 +3,7 @@
 > Automatically detect errors in AI-generated chest X-ray reports using multimodal deep learning.
 
 <!-- DEMO PLACEHOLDER -->
+
 <!-- **Live Demo:** [https://radguard.demo.link](https://radguard.demo.link) ← add when deployed -->
 
 ---
@@ -11,12 +12,12 @@
 
 AI-generated radiology reports are increasingly used in clinical workflows, but they make systematic errors that radiologists must manually catch before the reports reach patients. These errors fall into four categories:
 
-| Error Class | Meaning | Clinical Risk |
-|---|---|---|
-| **SUPPORTED** | AI finding matches the image | ✅ Correct |
-| **HALLUCINATED** | AI reported a finding not present in the image | 🔴 High — false positive |
-| **MISSING** | AI missed a finding that is present in the image | 🔴 High — false negative |
-| **INACCURATE** | AI found something but described it incorrectly | 🟡 Medium — misleading |
+| Error Class            | Meaning                                          | Clinical Risk             |
+| ---------------------- | ------------------------------------------------ | ------------------------- |
+| **SUPPORTED**    | AI finding matches the image                     | ✅ Correct                |
+| **HALLUCINATED** | AI reported a finding not present in the image   | 🔴 High — false positive |
+| **MISSING**      | AI missed a finding that is present in the image | 🔴 High — false negative |
+| **INACCURATE**   | AI found something but described it incorrectly  | 🟡 Medium — misleading   |
 
 Manual review of every AI report is expensive and slow. **RadGuard** automates this screening — flagging errors per condition across 14 chest pathologies — so radiologists can focus attention on the cases that matter.
 
@@ -25,6 +26,7 @@ Manual review of every AI report is expensive and slow. **RadGuard** automates t
 ## Solution
 
 A multimodal deep learning model that takes:
+
 - A **chest X-ray image**
 - An **AI-generated report sentence**
 
@@ -85,6 +87,7 @@ And produces per-condition error classifications across 14 chest conditions, wit
 Both encoders are jointly pretrained on MIMIC-CXR — the same dataset as our task. Their feature spaces are already aligned, making bidirectional cross-attention semantically meaningful. Earlier versions using DenseNet (ImageNet) + ClinicalBERT had mismatched feature spaces, creating a ceiling on performance.
 
 **Why Bidirectional Cross-Attention?**
+
 - *Text → Image*: each condition's text query attends to 196 spatial image regions, learning WHERE the condition is located
 - *Image → Text*: image features attend to report tokens, learning WHAT the AI said about each region
 - Together they build a joint image-text understanding needed to detect INACCURATE errors specifically
@@ -98,20 +101,22 @@ Each chest condition (Cardiomegaly, Pneumothorax, Pleural Effusion, etc.) has a 
 
 All versions trained on MIMIC-CXR dataset. Evaluation metric: **macro F1** averaged across all 14 conditions.
 
-| Version | Val F1 | Key Change | Notes |
-|---------|--------|------------|-------|
-| **V1** | 0.5468 | DenseNet-121 + ClinicalBERT baseline | MLP-Mixer fusion, no attention |
-| **V2** | 0.5619 | Condition-specific cross-attention + anatomy/entropy losses | Best DenseNet baseline |
-| **V3** | 0.5574 | Higher anatomy/entropy loss weights | Overfit to anatomy priors |
-| **V4** | 0.5397 | Entropy loss only, no anatomy | Attention collapse |
-| **V5** | 0.5518 | BioViL-T encoders (MIMIC-CXR pretrained) | Image resolution bug (upsampled) |
-| **V6** | 0.5625 | Original-res images + bidirectional attn + match type embed + INACCURATE aux | Fixed resolution bug |
-| **V7** | 0.5615 | Pseudo grounding loss (λ=0.15), anatomy λ=0.4 | Pseudo masks via BioViL |
-| **V8** | 0.5643 | Fixed condition-specific pseudo queries, anatomy λ=0.3 | Bug fix in V7 pseudo loss |
-| **V11** | **0.6600** | Stratified split + ReduceLROnPlateau + 74k clean MIMIC dataset | **Best model** |
+| Version       | Val F1           | Key Change                                                                   | Notes                            |
+| ------------- | ---------------- | ---------------------------------------------------------------------------- | -------------------------------- |
+| **V1**  | 0.5468           | DenseNet-121 + ClinicalBERT baseline                                         | MLP-Mixer fusion, no attention   |
+| **V2**  | 0.5619           | Condition-specific cross-attention + anatomy/entropy losses                  | Best DenseNet baseline           |
+| **V3**  | 0.5574           | Higher anatomy/entropy loss weights                                          | Overfit to anatomy priors        |
+| **V4**  | 0.5397           | Entropy loss only, no anatomy                                                | Attention collapse               |
+| **V5**  | 0.5518           | BioViL-T encoders (MIMIC-CXR pretrained)                                     | Image resolution bug (upsampled) |
+| **V6**  | 0.5625           | Original-res images + bidirectional attn + match type embed + INACCURATE aux | Fixed resolution bug             |
+| **V7**  | 0.5615           | Pseudo grounding loss (λ=0.15), anatomy λ=0.4                              | Pseudo masks via BioViL          |
+| **V8**  | 0.5643           | Fixed condition-specific pseudo queries, anatomy λ=0.3                      | Bug fix in V7 pseudo loss        |
+| **V11** | **0.6600** | Stratified split + ReduceLROnPlateau + 74k clean MIMIC dataset               | **Best model**             |
 
 ### V11 Breakthrough
+
 V11 identified and fixed three data/training issues that were suppressing performance in all previous versions:
+
 1. **FIX 1 — Stratified Split**: Previous train/val splits were random by row, causing data leakage across studies. V11 splits by patient study ID with stratification on error distribution.
 2. **FIX 2 — Balanced LR**: BioViL encoder LR (2e-6) and task head LR (1e-4) properly decoupled with separate optimizer param groups.
 3. **FIX 3 — ReduceLROnPlateau**: Replaces fixed cosine schedule with adaptive LR reduction (factor=0.5, patience=3) — LR drops when val F1 plateaus.
@@ -132,18 +137,18 @@ Support_Devices             │  No_Finding
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **Image Encoder** | BioViL-T (Microsoft Research, MIMIC-CXR pretrained) |
-| **Text Encoder** | CXR-BERT (Microsoft Research, MIMIC-CXR pretrained) |
-| **Framework** | PyTorch 2.x + AMP (automatic mixed precision) |
-| **Backend API** | FastAPI + Uvicorn |
-| **Frontend** | React 18 + Vite |
-| **Containerization** | Docker + Docker Compose |
-| **Model Registry** | MLflow (SQLite backend) |
-| **Dataset** | MIMIC-CXR (74,060 stratified samples, 14 conditions) |
-| **Training GPU** | NVIDIA RTX 5090 (33.7 GB VRAM) via Vast.ai |
-| **Model Hosting** | HuggingFace Hub |
+| Layer                      | Technology                                           |
+| -------------------------- | ---------------------------------------------------- |
+| **Image Encoder**    | BioViL-T (Microsoft Research, MIMIC-CXR pretrained)  |
+| **Text Encoder**     | CXR-BERT (Microsoft Research, MIMIC-CXR pretrained)  |
+| **Framework**        | PyTorch 2.x + AMP (automatic mixed precision)        |
+| **Backend API**      | FastAPI + Uvicorn                                    |
+| **Frontend**         | React 18 + Vite                                      |
+| **Containerization** | Docker + Docker Compose                              |
+| **Model Registry**   | MLflow (SQLite backend)                              |
+| **Dataset**          | MIMIC-CXR (74,060 stratified samples, 14 conditions) |
+| **Training GPU**     | NVIDIA RTX 5090 (33.7 GB VRAM) via Vast.ai           |
+| **Model Hosting**    | HuggingFace Hub                                      |
 
 ---
 
@@ -203,6 +208,7 @@ docker-compose up --build
 ### Without Docker
 
 **Backend:**
+
 ```bash
 cd backend
 pip install -r requirements.txt
@@ -210,6 +216,7 @@ uvicorn main:app --reload --port 8000
 ```
 
 **Frontend:**
+
 ```bash
 cd frontend
 npm install
@@ -225,13 +232,15 @@ npm run dev
 Analyze a chest X-ray image against an AI-generated report.
 
 **Request** (multipart/form-data):
-| Field | Type | Description |
-|---|---|---|
-| `image` | file | Chest X-ray (JPEG/PNG/DICOM) |
-| `report_text` | string | AI-generated report sentence |
-| `ai_labels` | string (JSON) | Optional: CheXbert labels `[float × 14]` |
+
+| Field           | Type          | Description                                 |
+| --------------- | ------------- | ------------------------------------------- |
+| `image`       | file          | Chest X-ray (JPEG/PNG/DICOM)                |
+| `report_text` | string        | AI-generated report sentence                |
+| `ai_labels`   | string (JSON) | Optional: CheXbert labels `[float × 14]` |
 
 **Response:**
+
 ```json
 {
   "conditions": {
@@ -278,8 +287,8 @@ If you use RadGuard in research, please cite:
 ```bibtex
 @misc{radguard2025,
   title  = {RadGuard: Multimodal Error Detection in AI-Generated Chest X-Ray Reports},
-  author = {[Author Name]},
-  year   = {2025},
+  author = {[Ali Raza]},
+  year   = {2026},
   note   = {Final Year Project, NUCES}
 }
 ```
