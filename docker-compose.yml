@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ../RadGuard-AI-Engine
+      dockerfile: ../RadGuard-Medical-AI/backend/Dockerfile
+    image: radguard-backend:latest
+    container_name: radguard-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - model_weights:/app/weights
+      - heatmap_results:/workspace/results
+    environment:
+      - MODEL_PATH=/app/weights/best_model_v11.pth
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./frontend
+    image: radguard-frontend:latest
+    container_name: radguard-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  model_weights:
+  heatmap_results:
