@@ -205,6 +205,15 @@ docker-compose up --build
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
+## Demo
+
+### Live Inference
+![Frontend](docs/Screenshot 2026-04-28 215143.jpg)
+![FrontEnd_Remaining](docs/Screenshot 2026-04-28 215155.jpg)
+
+### MLflow Experiment Tracking
+### Full Demo Video
+<video src="docs/bandicam 2026-04-28 01-12-47-957.mp4" controls width="100%"></video>
 ### Without Docker
 
 **Backend:**
