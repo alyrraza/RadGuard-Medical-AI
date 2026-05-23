@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RadGuard API Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; padding: 32px 16px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.6rem; margin-bottom: 4px; }
+    .subtitle { color: #8b949e; margin-bottom: 32px; font-size: 0.9rem; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 0.9rem; color: #8b949e; }
+    input[type=file] { width: 100%; padding: 12px; background: #0d1117; border: 1px dashed #30363d; border-radius: 8px; color: #e6edf3; cursor: pointer; }
+    textarea { width: 100%; padding: 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font-size: 0.9rem; resize: vertical; min-height: 120px; font-family: inherit; }
+    textarea:focus, input:focus { outline: none; border-color: #388bfd; }
+    button { width: 100%; padding: 14px; background: #238636; border: none; border-radius: 8px; color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #2ea043; }
+    button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+    .preview { max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 12px; display: none; }
+    #result { display: none; }
+    .score-box { text-align: center; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+    .score-num { font-size: 3rem; font-weight: 800; }
+    .score-grade { font-size: 1.2rem; margin-top: 4px; }
+    .grade-Excellent { background: #0d2b12; border: 1px solid #238636; }
+    .grade-Good      { background: #132b18; border: 1px solid #2ea043; }
+    .grade-Fair      { background: #2b2106; border: 1px solid #9e6a03; }
+    .grade-Poor      { background: #2b1306; border: 1px solid #da3633; }
+    .grade-Critical  { background: #3b0b0b; border: 1px solid #f85149; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { padding: 10px 12px; text-align: left; color: #8b949e; font-weight: 600; border-bottom: 1px solid #30363d; }
+    td { padding: 10px 12px; border-bottom: 1px solid #21262d; }
+    .verdict { font-weight: 600; }
+    .SUPPORTED    { color: #3fb950; }
+    .HALLUCINATED { color: #f85149; }
+    .MISSING      { color: #e3b341; }
+    .INACCURATE   { color: #d29922; }
+    .heatmaps { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+    .heatmaps img { width: 180px; height: 180px; border-radius: 8px; border: 1px solid #30363d; }
+    .heatmaps p { font-size: 0.75rem; color: #8b949e; text-align: center; margin-top: 4px; }
+    .heatmap-item { text-align: center; }
+    .error-box { background: #3b0b0b; border: 1px solid #f85149; border-radius: 8px; padding: 16px; color: #f85149; font-size: 0.875rem; white-space: pre-wrap; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #fff3; border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .meta { display: flex; gap: 16px; font-size: 0.8rem; color: #8b949e; margin-bottom: 16px; }
+    .meta span { background: #21262d; padding: 4px 10px; border-radius: 20px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🩻 RadGuard API Test</h1>
+    <p class="subtitle">Testing: https://alyrraza-radguard-api.hf.space</p>
+
+    <div class="card">
+      <label>Chest X-Ray Image</label>
+      <input type="file" id="imageInput" accept="image/*" onchange="previewImage(this)" />
+      <img id="preview" class="preview" />
+    </div>
+
+    <div class="card">
+      <label>AI-Generated Radiology Report</label>
+      <textarea id="reportText" placeholder="The heart is mildly enlarged. No pleural effusion is seen. Lungs are clear. No pneumothorax."></textarea>
+    </div>
+
+    <button id="analyzeBtn" onclick="analyze()">Analyze Report</button>
+
+    <div id="result" class="card" style="margin-top:20px;">
+      <div id="resultContent"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = "https://alyrraza-radguard-api.hf.space";
+
+    function previewImage(input) {
+      const preview = document.getElementById("preview");
+      if (input.files && input.files[0]) {
+        preview.src = URL.createObjectURL(input.files[0]);
+        preview.style.display = "block";
+      }
+    }
+
+    async function analyze() {
+      const btn = document.getElementById("analyzeBtn");
+      const resultDiv = document.getElementById("result");
+      const contentDiv = document.getElementById("resultContent");
+      const image = document.getElementById("imageInput").files[0];
+      const report = document.getElementById("reportText").value.trim();
+
+      if (!image) { alert("Please upload an X-ray image."); return; }
+      if (!report) { alert("Please enter the AI report text."); return; }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Analyzing...';
+      resultDiv.style.display = "none";
+
+      const form = new FormData();
+      form.append("file", image);
+      form.append("ai_report", report);
+
+      try {
+        const res = await fetch(`${API}/analyze`, { method: "POST", body: form });
+        const data = await res.json();
+
+        if (!res.ok) {
+          contentDiv.innerHTML = `<div class="error-box">${data.error || JSON.stringify(data)}</div>`;
+        } else {
+          const elrrs = data.task1_elrrs;
+          const grade = elrrs.grade;
+          const verdictEmoji = { SUPPORTED:"✅", HALLUCINATED:"🔴", MISSING:"🟠", INACCURATE:"🟡", NOT_MENTIONED:"⚪" };
+
+          let rows = data.task1_conditions.map(c => `
+            <tr>
+              <td>${c.name}</td>
+              <td class="verdict ${c.verdict}">${verdictEmoji[c.verdict]||""} ${c.verdict}</td>
+              <td>${(c.confidence*100).toFixed(0)}%</td>
+              <td style="color:#8b949e;font-size:0.8rem">${c.source_text||"—"}</td>
+            </tr>`).join("");
+
+          let heatmapHtml = "";
+          const hm = data.task3_heatmaps || {};
+          if (Object.keys(hm).length > 0) {
+            heatmapHtml = `<div style="margin-top:16px"><label style="display:block;margin-bottom:8px;color:#8b949e;font-size:0.85rem;font-weight:600">ATTENTION HEATMAPS</label><div class="heatmaps">` +
+              Object.entries(hm).map(([k,v]) => `<div class="heatmap-item"><img src="${v}" onerror="this.style.display='none'"/><p>${k}</p></div>`).join("") +
+              `</div></div>`;
+          }
+
+          contentDiv.innerHTML = `
+            <div class="score-box grade-${grade}">
+              <div class="score-num">${elrrs.score.toFixed(1)}</div>
+              <div class="score-grade">${grade}</div>
+            </div>
+            <div class="meta">
+              <span>✅ ${elrrs.supported_count} Supported</span>
+              <span>🔴 ${elrrs.hallucinated_count} Hallucinated</span>
+              <span>🟠 ${elrrs.missing_count} Missing</span>
+              <span>🟡 ${elrrs.inaccurate_count} Inaccurate</span>
+              <span>📝 ${data.sentences_analyzed} sentences</span>
+            </div>
+            <table>
+              <thead><tr><th>Condition</th><th>Verdict</th><th>Confidence</th><th>Source</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+            ${heatmapHtml}`;
+        }
+      } catch (err) {
+        contentDiv.innerHTML = `<div class="error-box">Network error: ${err.message}</div>`;
+      }
+
+      resultDiv.style.display = "block";
+      btn.disabled = false;
+      btn.innerHTML = "Analyze Report";
+    }
+  </script>
+</body>
+</html>

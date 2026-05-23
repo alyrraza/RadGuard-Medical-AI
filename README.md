@@ -2,9 +2,7 @@
 
 > Automatically detect errors in AI-generated chest X-ray reports using multimodal deep learning.
 
-**🌐 Live Demo:** [http://16.171.40.166:3000](http://16.171.40.166:3000) &nbsp;·&nbsp; **📊 MLflow Experiments:** [http://16.171.40.166:5000](http://16.171.40.166:5000)
-
-> ⚠️ Demo hosted on AWS EC2 (eu-north-1) for thesis evaluation. Available for a limited time.
+**🤗 Live Demo:** [radguard-demo on HF Spaces](https://huggingface.co/spaces/alyrraza/radguard-demo) &nbsp;·&nbsp; **⚡ API:** [radguard-api on HF Spaces](https://huggingface.co/spaces/alyrraza/radguard-api) &nbsp;·&nbsp; **🧠 Model Weights:** [alyrraza/radguard-v11](https://huggingface.co/alyrraza/radguard-v11)
 
 ---
 
@@ -148,7 +146,8 @@ Support_Devices             │  No_Finding
 | **Model Registry**   | MLflow (SQLite backend)                              |
 | **Dataset**          | MIMIC-CXR (74,060 stratified samples, 14 conditions) |
 | **Training GPU**     | NVIDIA RTX 5090 (33.7 GB VRAM) via Vast.ai           |
-| **Model Hosting**    | HuggingFace Hub                                      |
+| **Model Hosting**    | HuggingFace Hub (alyrraza/radguard-v11)              |
+| **API Deployment**   | HuggingFace Spaces — Docker SDK (2 vCPU, 16GB RAM)  |
 
 ---
 
@@ -158,16 +157,21 @@ Support_Devices             │  No_Finding
 RadGuard-Medical-AI/
 ├── README.md
 ├── docker-compose.yml
+├── frontend-test.html   ← standalone test page for the HF API
 │
-├── backend/
+├── ai-engine/           ← FastAPI ML service (deployed on HF Spaces)
 │   ├── Dockerfile
 │   ├── requirements.txt
-│   ├── main.py          ← FastAPI app, /predict endpoint
-│   ├── model.py         ← V6 architecture (BidirectionalCrossAttention)
-│   ├── inference.py     ← load weights, run inference, format output
-│   └── utils.py         ← image transforms, tokenizer helpers
+│   ├── main.py          ← /analyze endpoint
+│   └── inference/
+│       ├── model.py         ← V11 architecture + HF Hub auto-download
+│       ├── pipeline.py      ← ELRRs scoring, sentence aggregation
+│       └── chexbert_runner.py ← Stanford CheXbert label extractor
 │
-└── frontend/
+├── backend/             ← partner service (FastAPI + MongoDB)
+│   └── Dockerfile
+│
+└── frontend/            ← React 18 + Vite
     ├── Dockerfile
     ├── nginx.conf
     ├── package.json
@@ -177,12 +181,6 @@ RadGuard-Medical-AI/
         ├── App.jsx
         ├── index.css
         └── components/
-            ├── Header.jsx
-            ├── UploadPanel.jsx
-            ├── ResultsPanel.jsx
-            ├── ConditionCard.jsx
-            ├── AttentionMap.jsx
-            └── VersionBadge.jsx
 ```
 
 ---
@@ -202,8 +200,8 @@ docker-compose up --build
 ```
 
 - Frontend: http://localhost:3000
+- AI Engine API: http://localhost:7860/docs
 - Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
 
 ## Demo
 
@@ -235,46 +233,69 @@ npm run dev
 
 ## API Reference
 
-### `POST /predict`
+**Live endpoint:** `https://alyrraza-radguard-api.hf.space`
+
+### `POST /analyze`
 
 Analyze a chest X-ray image against an AI-generated report.
 
 **Request** (multipart/form-data):
 
-| Field           | Type          | Description                                 |
-| --------------- | ------------- | ------------------------------------------- |
-| `image`       | file          | Chest X-ray (JPEG/PNG/DICOM)                |
-| `report_text` | string        | AI-generated report sentence                |
-| `ai_labels`   | string (JSON) | Optional: CheXbert labels `[float × 14]` |
+| Field        | Type   | Description                          |
+| ------------ | ------ | ------------------------------------ |
+| `file`       | file   | Chest X-ray (JPEG/PNG)               |
+| `ai_report`  | string | AI-generated radiology report text   |
+
+**Example:**
+
+```bash
+curl -X POST https://alyrraza-radguard-api.hf.space/analyze \
+  -F "file=@chest_xray.jpg" \
+  -F "ai_report=There is a small right apical pneumothorax. The cardiac silhouette is normal."
+```
 
 **Response:**
 
 ```json
 {
-  "conditions": {
-    "Cardiomegaly": {
-      "error_class": "HALLUCINATED",
-      "confidence": 0.82,
-      "probabilities": {
-        "SUPPORTED": 0.05,
-        "HALLUCINATED": 0.82,
-        "MISSING": 0.08,
-        "INACCURATE": 0.05
-      },
-      "finding_present": 0.23,
-      "attention_map": [[0.01, 0.02, ...], ...],
-      "is_inaccurate_aux": 0.11
+  "task1_elrrs": {
+    "score": 65.0,
+    "grade": "Fair",
+    "supported_count": 2,
+    "hallucinated_count": 1,
+    "missing_count": 0,
+    "inaccurate_count": 1
+  },
+  "task1_conditions": [
+    {
+      "name": "Pneumothorax",
+      "verdict": "SUPPORTED",
+      "confidence": 0.91,
+      "xray_present": true,
+      "source_text": "There is a small right apical pneumothorax."
     }
+  ],
+  "task2_xray_findings": {
+    "Pneumothorax": { "xray_present": true, "confidence": 0.91 }
   },
-  "summary": {
-    "total_conditions": 14,
-    "flagged": ["Cardiomegaly", "Pleural_Effusion"],
-    "overall_risk": "HIGH"
+  "task3_heatmaps": {
+    "Pneumothorax": "https://alyrraza-radguard-api.hf.space/results/abc123_Pneumothorax.png"
   },
-  "model_version": "V11",
-  "inference_time_ms": 312
+  "not_mentioned": ["Edema", "Consolidation"],
+  "sentences_analyzed": 2,
+  "request_id": "abc123ef"
 }
 ```
+
+### ELRRs Score Grades
+
+| Score | Grade | Meaning |
+|---|---|---|
+| 80–100 | Excellent | Clinically safe |
+| 60–79  | Good      | Minor errors |
+| 40–59  | Fair      | Review advised |
+| 20–39  | Poor      | High risk |
+| 0–19   | Critical  | Unsafe |
 
 ---
 

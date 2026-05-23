@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+numpy
+pandas
+scipy
+nltk
+httpx
+python-dotenv
+torch
+torchvision
+transformers
+hi-ml-multimodal
+matplotlib
+huggingface_hub
